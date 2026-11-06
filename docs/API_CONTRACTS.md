@@ -1,6 +1,6 @@
 # LicenseLeak AI — API Contract Proposal
 
-**Status:** Discussion draft. Field names and status codes must be agreed with Person 1 before implementation.  
+**Status:** Case browsing endpoints are implemented in the backend starter; remaining endpoints and shared analysis fields are proposals for team review.
 **Base path:** `/api/v1`  
 **Content type:** `application/json`  
 **Demo currency:** USD (`USD`). Fee rules and amounts remain unset until the team approves the sample contract.
@@ -28,6 +28,8 @@
 | `POST /webhooks/paypal` | Verify and process a PayPal event idempotently. |
 | `GET /cases/{caseId}/audit` | Retrieve safe audit history for the case. |
 
+The implemented case list and case detail routes return `200 OK`. A missing case detail returns `404 Not Found` with the shared error shape. Final error behavior for the other proposed routes remains open.
+
 ## Proposed data shapes
 
 ### Case summary — `GET /cases`
@@ -39,7 +41,8 @@
       "caseId": "case-demo-001",
       "title": "Fictional campaign example",
       "scenarioType": "POSSIBLE_MISMATCH",
-      "status": "READY_FOR_ANALYSIS"
+      "status": "READY_FOR_ANALYSIS",
+      "fictional": true
     }
   ]
 }
@@ -57,7 +60,8 @@
   "contract": {
     "contractId": "contract-demo-001",
     "version": 1,
-    "title": "Demo licence"
+    "title": "Illustrative licence draft",
+    "summary": "Placeholder contract metadata; final wording and fee terms await team agreement."
   },
   "evidence": [
     {

@@ -52,6 +52,8 @@ Review this plan, `API_CONTRACTS.md`, and `USER_STORIES.md` together. Agree on t
 
 Create the Spring Boot Maven project, configure PostgreSQL through environment variables, enable Flyway migrations, and use Hibernate schema validation. Add fictional case/contract/evidence persistence and the case list/detail API. Document manual setup for both teammates and deployment configuration.
 
+**Progress:** Starter project, initial fictional case migration, and `GET /api/v1/cases` plus `GET /api/v1/cases/{caseId}` are in place. Local build and database startup still need to be checked after Java and PostgreSQL are available in the terminal.
+
 ### 2. Analysis and decision integration
 
 Integrate Person 1's agreed analysis interface (or a clearly labeled mock while that work is in progress). Persist analysis versions and creator approve/reject decisions. Verify that decisions point to the exact analysis and quote reviewed, and become stale when source data or quote changes.

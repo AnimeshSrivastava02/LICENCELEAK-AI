@@ -1,0 +1,21 @@
+spring:
+  application:
+    name: licenseleak-backend
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/licenseleak_ai}
+    username: ${DATABASE_USERNAME}
+    password: ${DATABASE_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  flyway:
+    enabled: true
+
+server:
+  port: ${PORT:8080}
