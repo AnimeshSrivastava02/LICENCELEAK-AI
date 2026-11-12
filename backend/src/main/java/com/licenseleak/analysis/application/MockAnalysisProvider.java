@@ -21,7 +21,7 @@ public class MockAnalysisProvider implements AnalysisProvider {
             case PERMITTED -> new AnalysisDraft(
                     AnalysisOutcome.PERMITTED,
                     "The recorded ad date falls within the license term shown in this case. Confirm the source record and permitted channels before closing the review.",
-                    List.of("clause-2"), evidenceIds, List.of(), "MOCK", "fictional-scenario-mock");
+                    List.of("usage-condition"), evidenceIds, List.of(), "MOCK", "fictional-scenario-mock");
             case AMBIGUOUS -> new AnalysisDraft(
                     AnalysisOutcome.AMBIGUOUS,
                     "The agreement end date or evidence timing is incomplete, so this case needs human review.",
