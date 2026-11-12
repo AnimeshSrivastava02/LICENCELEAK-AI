@@ -23,6 +23,7 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Matcher;
@@ -36,7 +37,10 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class AnalysisService {
 
-    private static final Pattern CLAUSE_ID = Pattern.compile("clause-[a-zA-Z0-9-]+");
+    private static final Pattern CLAUSE_ID = Pattern.compile(
+            "\\bclause(?:\\s+|-)([a-zA-Z0-9]+(?:-[a-zA-Z0-9]+)*)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern USAGE_CONDITION_SECTION = Pattern.compile(
+            "\\busage\\s+condition\\s*:", Pattern.CASE_INSENSITIVE);
 
     private final AnalysisProvider provider;
     private final AnalysisRunRepository analysisRepository;
@@ -120,7 +124,10 @@ public class AnalysisService {
         Set<String> allowedClauses = new HashSet<>();
         Matcher matcher = CLAUSE_ID.matcher(contractText);
         while (matcher.find()) {
-            allowedClauses.add(matcher.group().toLowerCase());
+            allowedClauses.add("clause-" + matcher.group(1).toLowerCase(Locale.ROOT));
+        }
+        if (USAGE_CONDITION_SECTION.matcher(contractText).find()) {
+            allowedClauses.add("usage-condition");
         }
         boolean invalidReference = draft.evidenceReferences().stream().anyMatch(id -> !evidenceIds.contains(id))
                 || draft.clauseReferences().stream().anyMatch(id -> !allowedClauses.contains(id.toLowerCase()));
