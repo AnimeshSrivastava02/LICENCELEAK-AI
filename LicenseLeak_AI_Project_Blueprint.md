@@ -17,17 +17,17 @@ The system is an assistive review tool, not a legal decision-maker. It must not 
 - Database: PostgreSQL.
 - Persistence: Spring Data JPA.
 - Schema migrations: Flyway. Hibernate/JPA validates the schema; it should not silently mutate production schema.
-- Local database: Docker Compose runs PostgreSQL only. Frontend and backend run locally during development.
+- Local database: PostgreSQL is installed and run manually for development; no Docker is used. The deployed application connects to a hosted PostgreSQL database through environment variables.
 - AI: Gemini API. Exact model/version is chosen by the AI-assigned teammate and recorded in the implementation notes.
 - Payments: PayPal REST Invoicing API using Sandbox for the demo.
 - Deployment: Render only.
 - Demo authentication: preconfigured demo creator account; no complex sign-up/auth flow for MVP.
 - Demo input: preloaded fictional contracts and matching fictional evidence. No live social-media scraping/monitoring in MVP.
 - Demo scenarios: at least one possible mismatch, one apparently permitted use, and one ambiguous case.
-- Currency/contract fee details: the team will settle the sample contract rules and currency. The rule must be explicit in the contract. Calculation is deterministic application code, not an LLM-generated amount.
+- Demo invoice currency: USD. The team will settle the sample contract wording and fee schedule before seeded financial rules are added. The rule must be explicit in the contract. Calculation is deterministic application code, not an LLM-generated amount.
 - Invoice gate: explicit creator approval is mandatory before invoice creation. Rejection must prevent invoice creation.
 - Audit trail: record analysis, evidence references, fee calculation, approval/rejection, invoice creation attempts/IDs, and verified invoice status changes. Never log API secrets.
-- Testing is a separate top-level folder and separate concern from production source.
+- Java tests use Maven's conventional backend test source tree; frontend and end-to-end tests stay under the separate top-level `/tests` folder.
 - Team split: Person 1 owns AI/licensing intelligence; Person 2 owns platform/payments/backend integration. Both contribute to UI, with ownership of specific screens agreed between them.
 - Avoid microservices. Build one modular monolith with one backend and one PostgreSQL database.
 
@@ -64,7 +64,7 @@ Spring Boot modular monolith
         ├── PayPal REST API (Sandbox; server-side only)
         └── PostgreSQL (Spring Data JPA + Flyway)
 
-Testing (separate top-level /tests)
+Testing (backend tests under Maven; frontend/e2e under top-level /tests)
   ├── backend unit / MVC / integration tests
   ├── frontend component tests
   └── end-to-end browser tests
@@ -85,14 +85,13 @@ Testing (separate top-level /tests)
 
 ## 5. Proposed repository and folder structure
 
-This is a monorepo. Keep tests in a dedicated top-level `/tests` directory as requested. Test source files should not be scattered through the production folders. If a Java build tool requires test source roots, configure Maven to use the external test directory or keep the conventional test source roots only if the team explicitly chooses that trade-off; the preferred structure is shown below and must be verified against Maven/Spring Boot tooling before implementation.
+This is a monorepo. Keep Java backend tests in Maven's conventional `backend/src/test/java` directory so Maven discovers them by default. Keep frontend and end-to-end tests in the top-level `/tests` directory. This is a deliberate beginner-friendly trade-off: Java tests remain with the Maven project, while browser and frontend tests stay separate from production code.
 
 ```text
 licenseleak-ai/
 ├── README.md
 ├── .gitignore
 ├── .env.example
-├── docker-compose.yml              # PostgreSQL only
 ├── docs/
 │   ├── PROJECT_BLUEPRINT.md
 │   ├── ARCHITECTURE.md
@@ -120,7 +119,7 @@ licenseleak-ai/
 │   └── public/
 ├── backend/
 │   ├── pom.xml
-│   └── src/main/
+│   ├── src/main/
 │       ├── java/com/licenseleak/
 │       │   ├── LicenseLeakApplication.java
 │       │   ├── config/
@@ -157,12 +156,9 @@ licenseleak-ai/
 │       └── resources/
 │           ├── application.yml
 │           └── db/migration/       # Flyway SQL migrations
+│   └── src/test/java/               # Maven-discovered backend tests
 ├── tests/
 │   ├── README.md
-│   ├── backend/
-│   │   ├── unit/
-│   │   ├── mvc/
-│   │   └── integration/
 │   ├── frontend/
 │   │   └── components/
 │   └── e2e/
@@ -172,9 +168,9 @@ licenseleak-ai/
         └── ci.yml
 ```
 
-### Testing-folder implementation note
+### Testing-folder note
 
-A separate top-level testing folder is the desired repository organization. Java's Maven/Surefire defaults expect tests under `backend/src/test/java`; placing them under `/tests/backend` requires explicit Maven configuration and may be less conventional. Before scaffolding, validate a small Maven configuration for the external test source root and ensure CI discovers tests. If that becomes fragile, agree explicitly on a compromise: keep Java tests in Maven's conventional test source root while retaining frontend/e2e tests in `/tests`. Do not silently assume tests are running—confirm test discovery in CI.
+Java test classes live in `backend/src/test/java`, where Maven/Surefire discovers them by default. Frontend component and browser end-to-end tests live under top-level `/tests`. When a test command is eventually run, confirm its output reports the expected tests; do not claim tests passed unless they were actually executed.
 
 ## 6. Backend module responsibilities
 
@@ -364,11 +360,11 @@ The exact PayPal base URL and webhook verification configuration must follow the
 
 ## 14. Suggested local development commands (after scaffolding)
 
-- Start database: `docker compose up -d postgres`
-- Stop database: `docker compose down`
+- Start PostgreSQL using the manually installed local service and the setup steps documented for the chosen operating system.
+- Stop PostgreSQL using the operating system's service controls.
 - Frontend: `cd frontend && npm install && npm run dev`
 - Backend: `cd backend && ./mvnw spring-boot:run` (or the Maven command generated by the project)
-- Tests: use documented root scripts/commands that run the suites under `/tests`; ensure CI uses the same commands.
+- Backend tests: run through Maven from `backend/`. Frontend and end-to-end tests: use documented root scripts for `/tests` and ensure CI uses the same commands.
 
 Exact service names and commands must match the actual files created; do not copy commands blindly before scaffolding.
 
@@ -389,7 +385,7 @@ Exact service names and commands must match the actual files created; do not cop
 ## 16. Open items deliberately not decided yet
 
 - Exact Gemini model/version and AI uncertainty policy: assigned to Person 1 to decide when they begin that work.
-- Final sample contract wording, fee schedule, and currency: team will agree before creating seeded contract data.
+- Final sample contract wording and fee schedule: team will agree before creating seeded financial data. Demo invoice currency is USD.
 - Exact DTO schemas, database relationships, and HTTP status codes: finalize in API/data model docs before parallel implementation.
 - Exact Spring Boot patch and compatible library versions: choose stable compatible versions at scaffolding time.
 - PayPal webhook event types and verification steps: verify against current official PayPal documentation during implementation.

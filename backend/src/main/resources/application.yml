@@ -1,0 +1,30 @@
+spring:
+  application:
+    name: licenseleak-backend
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://${DATABASE_HOST:localhost}:${DATABASE_PORT:5432}/${DATABASE_NAME:licenseleak_ai}}
+    username: ${DATABASE_USERNAME:licenseleak}
+    password: ${DATABASE_PASSWORD:}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  flyway:
+    enabled: true
+
+server:
+  port: ${PORT:8080}
+
+licenseleak:
+  analysis:
+    provider: ${LICENSELEAK_ANALYSIS_PROVIDER:mock}
+  fee:
+    daily-rate: ${LICENSELEAK_FEE_DAILY_RATE:10.00}
+    currency: ${LICENSELEAK_FEE_CURRENCY:USD}
+  invoice:
+    provider: ${LICENSELEAK_INVOICE_PROVIDER:mock}

@@ -1,0 +1,15 @@
+{
+  "java.configuration.runtimes": [
+    {
+      "name": "JavaSE-21",
+      "path": "C:\\Users\\acssr\\AppData\\Local\\Programs\\Eclipse Adoptium\\jdk-21.0.13.9-hotspot",
+      "default": true
+    }
+  ],
+  "java.jdt.ls.java.home": "C:\\Users\\acssr\\AppData\\Local\\Programs\\Eclipse Adoptium\\jdk-21.0.13.9-hotspot",
+  "terminal.integrated.defaultProfile.windows": "JavaSE-21 LTS",
+  "terminal.integrated.env.windows": {
+    "JAVA_HOME": "C:\\Users\\acssr\\AppData\\Local\\Programs\\Eclipse Adoptium\\jdk-21.0.13.9-hotspot",
+    "PATH": "C:\\Users\\acssr\\AppData\\Local\\Programs\\Eclipse Adoptium\\jdk-21.0.13.9-hotspot\\bin;${env:PATH}"
+  }
+}
