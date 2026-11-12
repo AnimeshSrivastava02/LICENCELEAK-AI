@@ -1,7 +1,7 @@
 # LicenseLeak AI — Implementation Plan
 
-**Status:** Discussion draft; review with both teammates before implementation.  
-**Owner focus:** Person 2 — backend, persistence, approvals, payments, and integration.
+**Status:** MVP implementation is in place; local case browsing was confirmed against PostgreSQL. Automated test and deployment verification remain.
+**Owner focus:** The current developer is coordinating and implementing the combined Person 1, Person 2, and shared MVP work.
 
 ## Project goal
 
@@ -12,11 +12,11 @@ Build a small demo that helps a creator review fictional licence terms and usage
 - One modular Spring Boot application, not microservices.
 - Java 21, Maven, PostgreSQL, Spring Data JPA, and Flyway.
 - Next.js, React, and TypeScript frontend.
-- Gemini analysis is owned by Person 1. Person 2 will integrate through an agreed interface and will not recreate the AI logic.
+- Gemini analysis follows a provider interface; a deterministic mock is the default for the demo, and an optional Gemini adapter is configured locally.
 - PayPal REST Invoicing API Sandbox for the payment demonstration.
-- USD is the agreed demo invoice currency. The sample contract wording and fee schedule remain undecided; do not seed or calculate a fee until the team agrees on the rule.
+- USD is the agreed demo invoice currency. The current fee rate is $10 per billable calendar day. Billable days begin the day after the contract's final valid date and include the date the out-of-contract ad is received. The rate is configurable.
 - PostgreSQL is installed and started manually for local development; do not use Docker. The deployed service connects to a hosted PostgreSQL database using environment variables.
-- Deployment target is Render, subject to confirming a compatible PostgreSQL service and project limits.
+- Deployment target is Render; deployment requires the team's Render account, hosted database, and configured secrets.
 - Person 2's work is developed on the `animesh` branch and integrated with the team through the agreed Git workflow.
 - Use fictional cases, contracts, and evidence only.
 - Java tests go in Maven's conventional `backend/src/test/java` source tree. Frontend and end-to-end tests go under top-level `/tests`.
@@ -26,10 +26,10 @@ Build a small demo that helps a creator review fictional licence terms and usage
 ### In scope
 
 - List and inspect preloaded fictional cases, contracts, and evidence.
-- Display structured analysis and uncertainty from Person 1's module (a mock can be used before integration).
+- Display structured analysis and uncertainty from the selected provider (mock by default; optional Gemini).
 - Persist creator approval or rejection against the exact analysis and fee quote reviewed.
 - Enforce approval and freshness on the backend.
-- Calculate fees deterministically with `BigDecimal` only after the sample rule is agreed.
+- Calculate each out-of-contract ad independently with `BigDecimal`: billable days run from the day after contract expiry through and including the ad receipt date. The default rate is configurable at $10 USD per ad per day.
 - Create a PayPal Sandbox invoice only for an approved, current, actionable fee quote.
 - Verify and deduplicate PayPal webhook events before updating invoice status.
 - Record safe audit events; never log secrets.
@@ -38,43 +38,49 @@ Build a small demo that helps a creator review fictional licence terms and usage
 
 - Live social-media monitoring or scraping.
 - Real customer data, real accusations, or legal conclusions.
-- Building Gemini prompts or analysis logic owned by Person 1.
-- Fee calculation before a signed-off sample contract rule exists.
+- Training a custom AI model or making legal determinations.
+- Live Gemini analysis as a requirement for the demo path; the mock provider supports offline rehearsal.
 - Production payments or a complex user login system.
 
 ## Suggested milestones
 
-### 0. Team contract review
+### 0. Local development baseline - complete
 
-Review this plan, `API_CONTRACTS.md`, and `USER_STORIES.md` together. Agree on the API fields shared with Person 1 and the initial data relationships before writing migrations.
+Java 21 and Maven work locally. PostgreSQL is connected, Flyway seeded the fictional cases, and both case list and case detail endpoints were confirmed working.
 
-### 1. Backend foundation and case browsing
+### 1. Agree on shared contracts - implemented
 
-Create the Spring Boot Maven project, configure PostgreSQL through environment variables, enable Flyway migrations, and use Hibernate schema validation. Add fictional case/contract/evidence persistence and the case list/detail API. Document manual setup for both teammates and deployment configuration.
+The shared DTO, versioning, and analysis/quote/decision/invoice relationships are implemented. Contract expiry and ad receipt are calendar dates; the receipt date is included and the final contract date is excluded from billable days. Missing dates prevent an actionable quote.
 
-**Progress:** Starter project, initial fictional case migration, and `GET /api/v1/cases` plus `GET /api/v1/cases/{caseId}` are in place. Local build and database startup still need to be checked after Java and PostgreSQL are available in the terminal.
+### 2. Analysis and licensing intelligence - implemented
 
-### 2. Analysis and decision integration
+The Gemini adapter, structured output, source references, and uncertainty policy are implemented behind a provider interface. The model does not calculate fees or interact with PayPal. The default mock supports offline demos.
 
-Integrate Person 1's agreed analysis interface (or a clearly labeled mock while that work is in progress). Persist analysis versions and creator approve/reject decisions. Verify that decisions point to the exact analysis and quote reviewed, and become stale when source data or quote changes.
+### 3. Shared frontend vertical slice - implemented
 
-### 3. Fee quote
+The Next.js frontend lists cases, presents details and analysis, handles decisions and invoices, and shows audit history with loading/error states and an assistive-tool disclaimer.
 
-Only after team agreement on contract wording, required inputs, rounding, and USD: implement and document the deterministic rule using `BigDecimal`. Ambiguous or missing inputs must produce no actionable quote.
+### 4. Persist analysis and implement deterministic fee quotes - implemented
 
-### 4. PayPal Sandbox and audit
+Flyway/JPA persist analysis versions and itemized fee quotes. The calculator is configured by `LICENSELEAK_FEE_DAILY_RATE` (default `10.00`) and `LICENSELEAK_FEE_CURRENCY` (default `USD`). It computes the date difference with `BigDecimal` amounts and makes quotes non-actionable when inputs or analysis are uncertain.
 
-Create invoices only after a valid persisted approval and actionable quote. Make duplicate requests safe, handle timeouts as uncertain, verify webhook authenticity, deduplicate event IDs, and record status transitions. Invoice creation or sending must not be shown as payment received.
+### 5. Creator decision and approval enforcement - implemented
 
-### 5. Deployment and rehearsal
+Persist approve/reject against the exact analysis and fee quote reviewed. Reject stale versions, missing/non-actionable quotes, and rejected cases for invoice eligibility. The backend is the source of truth for approval.
 
-Configure the backend, frontend, and hosted PostgreSQL service on Render using environment variables. Rehearse the fictional demo flow and keep a known-good path if external APIs fail.
+### 6. PayPal Sandbox invoices, audit, and webhooks - implemented; Sandbox credentials and end-to-end verification remain
+
+The PayPal guide covers Sandbox setup, server-only credentials, OAuth, invoice creation, idempotency, timeout reconciliation, webhook verification/deduplication, and audit records. A draft or sent invoice is never treated as paid.
+
+### 7. Tests, deployment, and demo rehearsal - in progress
+
+The unit suites cover mismatch/uncertainty, date fees, stale decisions, missing approval, duplicate invoice requests, and webhook payment status. Configure Render and secrets, then rehearse a demo path that uses the mock provider.
 
 ## PostgreSQL collaboration and deployment
 
 - Each developer can run a local PostgreSQL installation manually and use the same Flyway migrations and fictional seed data.
 - Keep connection settings outside source code. Use a documented environment-variable template with placeholder values; do not commit real passwords.
-- For deployment, configure the hosted PostgreSQL connection and credentials in the hosting environment. Do not depend on a developer's laptop database.
+- For deployment, follow [the Render guide](RENDER_DEPLOY_GUIDE.md) and configure the hosted PostgreSQL connection and credentials in the hosting environment. Do not depend on a developer's laptop database.
 - The app should use the same database engine and migration scripts locally and in deployment. Keep Hibernate in validation mode so Flyway owns schema changes.
 - Decide whether the team needs a shared development database or can work with separate local databases. If shared, restrict access and do not put credentials in Git or chat.
 - Before implementation, confirm the selected hosted database is compatible with the chosen deployment target and available within the team's account/budget.
@@ -84,20 +90,17 @@ Configure the backend, frontend, and hosted PostgreSQL service on Render using e
 Keep tests easy to discover:
 
 - Java unit, MVC, and integration tests: `backend/src/test/java` so Maven/Surefire finds them by default.
-- Frontend component tests: `tests/frontend/`.
+- Frontend component tests: `frontend/tests/` (kept within the frontend package for Windows/Vitest path resolution).
 - Browser end-to-end tests: `tests/e2e/`.
 
-When tests are eventually run, check the command output to confirm the expected tests were discovered. External Gemini and PayPal calls should be mocked in automated tests. Testing is a later implementation activity; this document does not claim any tests have run.
+External Gemini and PayPal calls are mocked in unit tests. Latest verification: 11 backend tests and 3 frontend tests pass; frontend typecheck, lint, and production build pass. Render deployment and live Sandbox rehearsal need the team's account credentials.
 
 ## Decisions still needed from the team
 
-- Exact initial database relationships and constraints.
-- Person 1's analysis and uncertainty fields and shared DTO boundary.
-- Sample contract text, fee rule, required inputs, and rounding behavior.
-- Exact API response fields and final HTTP status codes.
 - Whether local databases are separate per developer or shared.
-- Hosted PostgreSQL choice and deployment connection details.
-- PayPal webhook event types and verification steps, to be checked against official PayPal documentation during implementation.
+- Hosted PostgreSQL and Render service details and credentials.
+- Person 1/team review of the implemented analysis DTO and prompt policy.
+- Team confirmation whether the $10 USD per-ad daily rate needs to change; it can be changed through configuration.
 
 ## Safety and correctness rules
 

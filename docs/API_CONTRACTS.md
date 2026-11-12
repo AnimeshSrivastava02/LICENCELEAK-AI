@@ -1,9 +1,9 @@
 # LicenseLeak AI — API Contract Proposal
 
-**Status:** Case browsing endpoints are implemented in the backend starter; remaining endpoints and shared analysis fields are proposals for team review.
+**Status:** Case, analysis, decision, invoice, audit, and webhook routes are implemented. Gemini and PayPal use configurable adapters; mock adapters are the local defaults.
 **Base path:** `/api/v1`  
 **Content type:** `application/json`  
-**Demo currency:** USD (`USD`). Fee rules and amounts remain unset until the team approves the sample contract.
+**Demo currency:** USD (`USD`). Current fee-rate decision: $10 per billable calendar day. Billable days are the calendar days after the contract's final valid date through the date the out-of-contract ad is received, inclusive of the receipt date. The rate is configurable.
 
 ## Shared conventions
 
@@ -12,25 +12,26 @@
 - Money is represented as a decimal string plus a three-letter currency code; do not send JSON floating-point money values.
 - An absent or non-actionable `feeQuote` must never be treated as permission to invoice.
 - The backend is the source of truth for approval, quote freshness, and invoice eligibility.
-- Exact response fields and HTTP status codes in this draft are proposals.
+- Response fields below reflect the implemented API. Error responses contain `code` and `message`.
 
-## Proposed endpoints
+## Endpoints
 
 | Method and path | Purpose |
 |---|---|
 | `GET /cases` | List fictional demo cases. |
 | `GET /cases/{caseId}` | Get case, contract summary, and evidence metadata. |
-| `POST /cases/{caseId}/analysis` | Request a new analysis. Sync/async behavior remains to be agreed with Person 1. |
+| `POST /cases/{caseId}/analysis` | Run and persist a new synchronous analysis. |
 | `GET /cases/{caseId}/analysis` | Get the latest persisted analysis. |
 | `POST /cases/{caseId}/decision` | Persist an approval or rejection tied to the reviewed analysis and quote. |
+| `GET /cases/{caseId}/decision` | Retrieve the latest persisted creator decision. |
 | `POST /cases/{caseId}/invoice` | Request invoice creation; backend checks persisted current approval and quote. |
 | `GET /cases/{caseId}/invoice` | Retrieve the known invoice and status. |
 | `POST /webhooks/paypal` | Verify and process a PayPal event idempotently. |
 | `GET /cases/{caseId}/audit` | Retrieve safe audit history for the case. |
 
-The implemented case list and case detail routes return `200 OK`. A missing case detail returns `404 Not Found` with the shared error shape. Final error behavior for the other proposed routes remains open.
+Missing cases and missing latest analysis/decision/invoice records return `404 Not Found` with the shared error shape. Stale or ineligible decisions return `409 Conflict`. Provider failures return safe `502`/`503` errors or a persisted `UNKNOWN` invoice state when the remote result cannot be confirmed.
 
-## Proposed data shapes
+## Data shapes
 
 ### Case summary — `GET /cases`
 
@@ -57,17 +58,20 @@ The implemented case list and case detail routes return `200 OK`. A missing case
   "caseId": "case-demo-001",
   "title": "Fictional campaign example",
   "fictional": true,
-  "contract": {
+    "contract": {
     "contractId": "contract-demo-001",
     "version": 1,
     "title": "Illustrative licence draft",
-    "summary": "Placeholder contract metadata; final wording and fee terms await team agreement."
+      "summary": "Fictional sample campaign licence terms.",
+      "validThrough": "2026-10-01"
   },
   "evidence": [
     {
       "evidenceId": "evidence-demo-001",
       "type": "CAMPAIGN_POST",
-      "label": "Fictional sample post"
+      "label": "Fictional sample post",
+      "adReceivedOn": "2026-10-04",
+      "outOfContract": true
     }
   ]
 }
@@ -75,7 +79,7 @@ The implemented case list and case detail routes return `200 OK`. A missing case
 
 ### Analysis — `POST /cases/{caseId}/analysis` and `GET /cases/{caseId}/analysis`
 
-Proposed response shape; Person 1 owns the final analysis schema.
+Analysis is synchronous. A mock provider is used by default; Gemini is optional.
 
 ```json
 {
@@ -88,25 +92,38 @@ Proposed response shape; Person 1 owns the final analysis schema.
   "evidenceReferences": ["evidence-demo-001"],
   "uncertainties": ["Required campaign duration is not available."],
   "feeQuote": null,
+  "source": "MOCK",
+  "modelName": "fictional-scenario-mock",
   "createdAt": "2026-10-31T12:00:00Z"
 }
 ```
 
-Outcomes are proposed as `POSSIBLE_MISMATCH`, `PERMITTED`, and `AMBIGUOUS`. A quote may be absent or explicitly non-actionable if inputs/rules are incomplete. The contract and exact amount rule are still open; do not invent an amount.
+Outcomes are `POSSIBLE_MISMATCH`, `PERMITTED`, and `AMBIGUOUS`. A quote may be absent or non-actionable if inputs/rules are incomplete. The calculator uses the configurable rate per ad, default `$10.00 USD`, where `billableDays = max(0, days between contractValidThrough and adReceivedOn)`. Both fields are calendar dates. The contract final date is excluded and the receipt date is included. Do not create an actionable quote if either date is missing or uncertain.
 
-If a quote is actionable after team approval, the proposed shape is:
+An actionable quote has this shape:
 
 ```json
 {
   "feeQuoteId": "quote-demo-001",
-  "amount": "<decimal string from the agreed rule>",
+  "amount": "30.00",
   "currency": "USD",
-  "ruleReference": "contract-clause-reference",
-  "actionable": true
+  "dailyRate": "10.00",
+  "billableDays": 3,
+  "ruleReference": "DAILY_RATE_PER_BILLABLE_DAY",
+  "actionable": true,
+  "items": [
+    {
+      "evidenceId": "evidence-demo-001",
+      "contractValidThrough": "2026-10-01",
+      "adReceivedOn": "2026-10-04",
+      "billableDays": 3,
+      "amount": "30.00"
+    }
+  ]
 }
 ```
 
-The amount is a placeholder, not an agreed fee rule or seed value.
+The amount is `dailyRate × billableDays` per out-of-contract ad, then summed. Example: valid through Oct 1 and received Oct 4 gives 3 days and `$30.00` at the default rate.
 
 ### Decision — `POST /cases/{caseId}/decision`
 
@@ -122,7 +139,7 @@ Request:
 
 For a rejection, use `"decision": "REJECT"`; `feeQuoteId` may be omitted if no quote exists. The backend must confirm the referenced analysis and quote belong to the case and are current. A rejection always blocks invoice creation.
 
-Proposed response:
+Response:
 
 ```json
 {
@@ -130,25 +147,29 @@ Proposed response:
   "decision": "APPROVE",
   "analysisId": "analysis-demo-001",
   "feeQuoteId": "quote-demo-001",
-  "status": "CURRENT",
   "decidedAt": "2026-10-31T12:05:00Z"
 }
 ```
 
+The decision must reference the latest analysis. An approval may be recorded without a quote for review purposes, but invoice creation requires a current positive actionable quote. A rejection blocks invoicing.
+
 ### Invoice — `POST /cases/{caseId}/invoice` and `GET /cases/{caseId}/invoice`
 
-The request body is proposed to be empty: the backend loads the current persisted decision and quote itself. The client must not be able to authorize an invoice by sending `approved: true`.
+The request body is empty: the backend loads the current persisted decision and quote itself. The client must not be able to authorize an invoice by sending `approved: true`.
 
-Proposed response:
+Response:
 
 ```json
 {
-  "invoiceId": "invoice-record-001",
-  "providerInvoiceId": "PAYPAL-INVOICE-ID",
+  "invoiceRecordId": "invoice-record-001",
+  "provider": "MOCK",
+  "providerInvoiceId": "MOCK-INVOICE-ID",
   "status": "DRAFT",
   "currency": "USD",
   "approvalDecisionId": "decision-demo-001",
-  "createdAt": "2026-10-31T12:10:00Z"
+  "invoiceUrl": null,
+  "createdAt": "2026-10-31T12:10:00Z",
+  "updatedAt": "2026-10-31T12:10:00Z"
 }
 ```
 
@@ -156,11 +177,11 @@ The backend uses a stable persisted idempotency/business key. Repeated requests 
 
 ### PayPal webhook — `POST /webhooks/paypal`
 
-The endpoint receives PayPal's provider payload and verification headers. It must verify authenticity using PayPal's supported verification process before changing invoice state. Persist/deduplicate provider event IDs. Exact event types and response behavior must be confirmed during implementation with official PayPal documentation.
+The endpoint receives PayPal's provider payload and verification headers. In PayPal mode it verifies authenticity with PayPal before changing invoice state. Event IDs are deduplicated; SENT, PAID, and CANCELLED events update matching invoices. Unmatched events are held and replayed when the invoice ID is later recorded.
 
 ### Audit — `GET /cases/{caseId}/audit`
 
-Proposed response:
+Response:
 
 ```json
 {
@@ -177,30 +198,27 @@ Proposed response:
 
 Audit output must not contain credentials, API keys, or unnecessary personal data.
 
-## Proposed error shape
+## Error shape
 
 ```json
 {
   "code": "APPROVAL_REQUIRED",
-  "message": "A current creator approval is required before an invoice can be created.",
-  "requestId": "request-demo-001"
+  "message": "A current creator approval is required before an invoice can be created."
 }
 ```
 
-Proposed HTTP status mapping, to be reviewed:
+HTTP status mapping:
 
 | Status | Use |
 |---|---|
 | `400` | Malformed request or validation error. |
 | `404` | Case or requested record not found. |
 | `409` | Stale approval, rejected case, duplicate/conflicting state, or invoice not eligible. |
-| `422` | Validly formed request that cannot be processed because business inputs are incomplete or ambiguous. |
-| `502` / `503` | Provider unavailable or provider result uncertain; exact handling depends on reconciliation design. |
+| `502` | Invoice provider failure. An uncertain result is stored as `UNKNOWN` and must be reconciled before retrying. |
+| `503` | Analysis provider unavailable. |
 
-## Decisions to make with Person 1 and the team
+## Remaining team decisions
 
-- Final analysis/uncertainty DTO and sync versus async behavior.
-- Whether decision requests require a quote for all approvals or permit approval of an analysis that has no actionable quote.
-- Initial database relationships and version/freshness fields.
-- Final error/status mapping and idempotency response behavior.
-- Sample contract wording, fee rule, required inputs, and rounding before any actionable quote is produced.
+- Whether the local database is shared across developers or kept separate.
+- Hosted PostgreSQL, Render, Gemini, and PayPal Sandbox credentials/configuration for the live demo.
+- Team review of analysis wording and the initial `$10.00 USD` rate. The rate is configurable.

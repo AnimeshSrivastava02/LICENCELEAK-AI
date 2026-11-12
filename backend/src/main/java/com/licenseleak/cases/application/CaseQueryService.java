@@ -44,11 +44,13 @@ public class CaseQueryService {
                 .orElseThrow(() -> new IllegalStateException("Case is missing its fictional contract metadata"));
 
         List<EvidenceSummary> evidence = evidenceRepository.findAllByCaseIdOrderByIdAsc(caseId).stream()
-                .map(item -> new EvidenceSummary(item.getId(), item.getType(), item.getLabel()))
+                .map(item -> new EvidenceSummary(
+                        item.getId(), item.getType(), item.getLabel(), item.getAdReceivedOn(), item.isOutOfContract()))
                 .toList();
 
         ContractSummary contractSummary = new ContractSummary(
-                contract.getId(), contract.getVersion(), contract.getTitle(), contract.getSummary());
+                contract.getId(), contract.getVersion(), contract.getTitle(), contract.getSummary(),
+                contract.getContractValidThrough());
 
         return new CaseDetailResponse(
                 demoCase.getId(), demoCase.getTitle(), demoCase.isFictional(), contractSummary, evidence);

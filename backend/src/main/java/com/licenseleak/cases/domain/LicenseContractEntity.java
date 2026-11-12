@@ -4,6 +4,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import java.time.LocalDate;
 
 @Entity
 @Table(name = "license_contract")
@@ -24,6 +25,9 @@ public class LicenseContractEntity {
 
     @Column(columnDefinition = "text", nullable = false)
     private String summary;
+
+    @Column(name = "contract_valid_through")
+    private LocalDate contractValidThrough;
 
     protected LicenseContractEntity() {
     }
@@ -46,5 +50,9 @@ public class LicenseContractEntity {
 
     public String getSummary() {
         return summary;
+    }
+
+    public LocalDate getContractValidThrough() {
+        return contractValidThrough;
     }
 }
